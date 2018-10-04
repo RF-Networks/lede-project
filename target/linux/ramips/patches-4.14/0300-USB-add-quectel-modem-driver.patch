@@ -1,6 +1,6 @@
 --- a/drivers/usb/serial/option.c
 +++ b/drivers/usb/serial/option.c
-@@ -245,6 +245,8 @@ static void option_instat_callback(struc
+@@ -247,6 +247,8 @@ static void option_instat_callback(struc
  /* These Quectel products use Quectel's vendor ID */
  #define QUECTEL_PRODUCT_EC21			0x0121
  #define QUECTEL_PRODUCT_EC25			0x0125
@@ -9,7 +9,7 @@
  #define QUECTEL_PRODUCT_BG96			0x0296
  #define QUECTEL_PRODUCT_EP06			0x0306
  
-@@ -1080,6 +1082,10 @@ static const struct usb_device_id option
+@@ -1084,6 +1086,10 @@ static const struct usb_device_id option
  	  .driver_info = RSVD(4) },
  	{ USB_DEVICE(QUECTEL_VENDOR_ID, QUECTEL_PRODUCT_BG96),
  	  .driver_info = RSVD(4) },
@@ -20,7 +20,7 @@
  	{ USB_DEVICE(QUECTEL_VENDOR_ID, QUECTEL_PRODUCT_EP06),
  	  .driver_info = RSVD(4) | RSVD(5) },
  	{ USB_DEVICE(CMOTECH_VENDOR_ID, CMOTECH_PRODUCT_6001) },
-@@ -1970,6 +1976,7 @@ static struct usb_serial_driver option_1
+@@ -1974,6 +1980,7 @@ static struct usb_serial_driver option_1
  #ifdef CONFIG_PM
  	.suspend           = usb_wwan_suspend,
  	.resume            = usb_wwan_resume,
@@ -28,7 +28,18 @@
  #endif
  };
  
-@@ -2007,6 +2014,10 @@ static int option_probe(struct usb_seria
+@@ -1992,8 +1999,9 @@ static int option_probe(struct usb_seria
+ 	unsigned long device_flags = id->driver_info;
+ 
+ 	/* Never bind to the CD-Rom emulation interface	*/
+-	if (iface_desc->bInterfaceClass == 0x08)
++	if (iface_desc->bInterfaceClass == 0x08) {
+ 		return -ENODEV;
++    }
+ 
+ 	/*
+ 	 * Don't bind reserved interfaces (like network ones) which often have
+@@ -2011,6 +2019,10 @@ static int option_probe(struct usb_seria
  	    iface_desc->bInterfaceClass != USB_CLASS_CDC_DATA)
  		return -ENODEV;
  
@@ -56,14 +67,15 @@
  
 --- a/drivers/net/usb/qmi_wwan.c
 +++ b/drivers/net/usb/qmi_wwan.c
-@@ -446,6 +446,22 @@ static const u8 default_modem_addr[ETH_A
+@@ -446,6 +446,23 @@ static const u8 default_modem_addr[ETH_A
  
  static const u8 buggy_fw_addr[ETH_ALEN] = {0x00, 0xa0, 0xc6, 0x00, 0x00, 0x00};
  
 +struct sk_buff* qmi_wwan_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t flags)
 +{
-+    if (dev->udev->descriptor.idVendor != cpu_to_le16(0x2C7C))
++    if (dev->udev->descriptor.idVendor != cpu_to_le16(0x2C7C)) {
 +        return skb;
++    }
 +
 +    // Skip Ethernet header from message
 +    if (skb_pull(skb, ETH_HLEN)) {
@@ -79,17 +91,28 @@
  /* Make up an ethernet header if the packet doesn't have one.
   *
   * A firmware bug common among several devices cause them to send raw
-@@ -472,6 +488,9 @@ static int qmi_wwan_rx_fixup(struct usbn
+@@ -472,12 +489,18 @@ static int qmi_wwan_rx_fixup(struct usbn
  	bool rawip = info->flags & QMI_WWAN_FLAG_RAWIP;
  	__be16 proto;
  
-+    if (dev->udev->descriptor.idVendor != cpu_to_le16(0x2C7C))
++    if (dev->udev->descriptor.idVendor != cpu_to_le16(0x2C7C)) {
 +        return 1;
++    }
 +
  	/* This check is no longer done by usbnet */
- 	if (skb->len < dev->net->hard_header_len)
+-	if (skb->len < dev->net->hard_header_len)
++	if (skb->len < dev->net->hard_header_len) {
  		return 0;
-@@ -740,6 +759,20 @@ static int qmi_wwan_bind(struct usbnet *
++    }
+ 
+-	if (info->flags & QMI_WWAN_FLAG_MUX)
++	if (info->flags & QMI_WWAN_FLAG_MUX) {
+ 		return qmimux_rx_fixup(dev, skb);
++    }
+ 
+ 	switch (skb->data[0] & 0xf0) {
+ 	case 0x40:
+@@ -740,6 +763,20 @@ static int qmi_wwan_bind(struct usbnet *
  	}
  	dev->net->netdev_ops = &qmi_wwan_netdev_ops;
  	dev->net->sysfs_groups[0] = &qmi_wwan_sysfs_attr_group;
@@ -110,7 +133,7 @@
  err:
  	return status;
  }
-@@ -831,6 +864,7 @@ static const struct driver_info	qmi_wwan
+@@ -831,6 +868,7 @@ static const struct driver_info	qmi_wwan
  	.unbind		= qmi_wwan_unbind,
  	.manage_power	= qmi_wwan_manage_power,
  	.rx_fixup       = qmi_wwan_rx_fixup,
@@ -118,7 +141,7 @@
  };
  
  static const struct driver_info	qmi_wwan_info_quirk_dtr = {
-@@ -840,6 +874,7 @@ static const struct driver_info	qmi_wwan
+@@ -840,6 +878,7 @@ static const struct driver_info	qmi_wwan
  	.unbind		= qmi_wwan_unbind,
  	.manage_power	= qmi_wwan_manage_power,
  	.rx_fixup       = qmi_wwan_rx_fixup,
@@ -126,12 +149,23 @@
  	.data           = QMI_WWAN_QUIRK_DTR,
  };
  
-@@ -1250,6 +1285,8 @@ static const struct usb_device_id produc
- 	{QMI_FIXED_INTF(0x1e0e, 0x9001, 5)},	/* SIMCom 7230E */
+@@ -1253,8 +1292,10 @@ static const struct usb_device_id produc
  	{QMI_QUIRK_SET_DTR(0x2c7c, 0x0125, 4)},	/* Quectel EC25, EC20 R2.0  Mini PCIe */
  	{QMI_QUIRK_SET_DTR(0x2c7c, 0x0121, 4)},	/* Quectel EC21 Mini PCIe */
-+    {QMI_FIXED_INTF(0x2c7c, 0x0191, 4)},	/* Quectel EG91 */
-+    {QMI_FIXED_INTF(0x2c7c, 0x0195, 4)},	/* Quectel EG95 */
+ 	{QMI_QUIRK_SET_DTR(0x2c7c, 0x0191, 4)},	/* Quectel EG91 */
++    {QMI_QUIRK_SET_DTR(0x2C7C, 0x0195, 4)}, /* Quectel EG95 */
  	{QMI_FIXED_INTF(0x2c7c, 0x0296, 4)},	/* Quectel BG96 */
  	{QMI_QUIRK_SET_DTR(0x2c7c, 0x0306, 4)},	/* Quectel EP06 Mini PCIe */
++    {QMI_QUIRK_SET_DTR(0x2C7C, 0x0435, 4)}, /* Quectel AG35 */
  
+ 	/* 4. Gobi 1000 devices */
+ 	{QMI_GOBI1K_DEVICE(0x05c6, 0x9212)},	/* Acer Gobi Modem Device */
+@@ -1284,7 +1325,7 @@ static const struct usb_device_id produc
+ 	{QMI_GOBI_DEVICE(0x05c6, 0x9225)},	/* Sony Gobi 2000 Modem device (N0279, VU730) */
+ 	{QMI_GOBI_DEVICE(0x05c6, 0x9245)},	/* Samsung Gobi 2000 Modem device (VL176) */
+ 	{QMI_GOBI_DEVICE(0x03f0, 0x251d)},	/* HP Gobi 2000 Modem device (VP412) */
+-	{QMI_GOBI_DEVICE(0x05c6, 0x9215)},	/* Acer Gobi 2000 Modem device (VP413) */
++	//{QMI_GOBI_DEVICE(0x05c6, 0x9215)},	/* Acer Gobi 2000 Modem device (VP413) */
+ 	{QMI_FIXED_INTF(0x05c6, 0x9215, 4)},	/* Quectel EC20 Mini PCIe */
+ 	{QMI_GOBI_DEVICE(0x05c6, 0x9265)},	/* Asus Gobi 2000 Modem device (VR305) */
+ 	{QMI_GOBI_DEVICE(0x05c6, 0x9235)},	/* Top Global Gobi 2000 Modem device (VR306) */
